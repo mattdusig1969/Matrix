@@ -33,44 +33,40 @@ export default function EmbeddedModule() {
   }
 
   useEffect(() => {
-    const fetchCreative = async (newCreativeId) => {
-      const id = newCreativeId || creative_id;
-      if (!id) return;
+  const fetchCreative = async () => {
+    if (!creative_id) return;
 
-      const { data, error } = await supabase
-        .from('CreativeVariants')
-        .select('html_code, css_code')
-        .eq('id', id)
-        .single();
+    const { data, error } = await supabase
+      .from('CreativeVariants')
+      .select('html_code, css_code')
+      .eq('id', creative_id)
+      .single();
 
-      if (error || !data) return;
+    if (error || !data) return;
 
-      // Remove previously injected styles
-      document.querySelectorAll('style[data-injected-creative-style]').forEach(el => el.remove());
+    // Remove previously injected styles
+    document.querySelectorAll('style[data-injected-creative-style]').forEach(el => el.remove());
 
-      // Inject CSS
-      const styleTag = document.createElement('style');
-      styleTag.setAttribute('data-injected-creative-style', 'true');
-      styleTag.innerHTML = data.css_code;
-      document.head.appendChild(styleTag);
+    // Inject CSS
+    // 1. Remove old styles first
+document.querySelectorAll('style[data-injected-creative-style]').forEach(el => el.remove());
 
-      setCreativeHTML(data.html_code);
-    };
+// 2. Inject CSS synchronously
+const styleTag = document.createElement('style');
+styleTag.setAttribute('data-injected-creative-style', 'true');
+styleTag.innerHTML = data.css_code;
+document.head.appendChild(styleTag);
 
-    fetchCreative();
+// Delay setting HTML slightly to allow CSS to fully apply
+setTimeout(() => {
+  setCreativeHTML(data.html_code);
+}, 0);
 
-    const handleMessage = (event) => {
-      if (event.data.type === 'update-creative') {
-        fetchCreative(event.data.creativeId);
-      }
-    };
 
-    window.addEventListener('message', handleMessage);
+  };
 
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [creative_id]);
+  fetchCreative();
+}, [creative_id]);
 
 
 
@@ -266,6 +262,7 @@ setResponses(existingUser.demo_attributes || {});
   <div
     key={creative_id}
     style={{
+      pointerEvents: 'none',
       position: 'relative',
       zIndex: 0,
       marginBottom: '12px'
@@ -354,6 +351,7 @@ setResponses(existingUser.demo_attributes || {});
   <div
     key={creative_id}
     style={{
+      pointerEvents: 'none',
       position: 'relative',
       zIndex: 0,
       marginBottom: '12px'
