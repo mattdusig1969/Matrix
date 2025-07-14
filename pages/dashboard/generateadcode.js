@@ -23,6 +23,7 @@ export default function GenerateAdCodePage() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [creativeVariants, setCreativeVariants] = useState([]);
   const [selectedCreative, setSelectedCreative] = useState(null);
+  const iframeRef = useRef(null);
   const DEFAULT_STYLE = "Style A - Bold & Clean";
 
 
@@ -61,18 +62,11 @@ useEffect(() => {
   }
 
   useEffect(() => {
-  // Remove any previous styles
-  document.querySelectorAll('style[data-preview-style]').forEach(el => el.remove());
-
-  // Only inject if valid css_code
-  if (selectedCreative?.css_code?.trim()) {
-    // Use requestAnimationFrame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      const styleTag = document.createElement('style');
-      styleTag.setAttribute('data-preview-style', 'true');
-      styleTag.innerHTML = selectedCreative.css_code;
-      document.head.appendChild(styleTag);
-    });
+  if (iframeRef.current && selectedCreative) {
+    iframeRef.current.contentWindow.postMessage({
+      type: 'update-creative',
+      creativeId: selectedCreative.id,
+    }, '*');
   }
 }, [selectedCreative]);
 
@@ -150,77 +144,45 @@ useEffect(() => {
   }
 
   async function generateIframeCode() {
-  if (!selectedSurvey?.id) {
-    toast.error('Please select a survey');
-    return;
+    if (!selectedSurvey?.id) {
+      toast.error('Please select a survey');
+      return;
+    }
+
+    const { data: modules, error } = await supabase
+      .from('Modules')
+      .select('id')
+      .eq('survey_id', selectedSurvey.id);
+
+    if (error || !modules?.length) {
+      toast.error('No modules found for this survey');
+      return;
+    }
+
+    const selectedModule = modules[Math.floor(Math.random() * modules.length)];
+    const moduleId = selectedModule.id;
+    const creativeId = selectedCreative?.id;
+
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'update-creative',
+        creativeId: creativeId,
+      }, '*');
+    } else {
+      const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
+      const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
+      const iframe = `
+        <iframe
+          src="${src}"
+          width="340"
+          height="660"
+          style="border:none;"
+          allow="fullscreen"
+        ></iframe>
+      `.trim();
+      setAdCode(iframe);
+    }
   }
-
-  async function generateIframeCode() {
-  if (!selectedSurvey?.id) {
-    toast.error('Please select a survey');
-    return;
-  }
-
-  const { data: modules, error } = await supabase
-    .from('Modules')
-    .select('id')
-    .eq('survey_id', selectedSurvey.id);
-
-  if (error || !modules?.length) {
-    toast.error('No modules found for this survey');
-    return;
-  }
-
-  const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-  const moduleId = selectedModule.id;
-  const creativeId = selectedCreative?.id;
-  const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
-
-  const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
-
-  const iframe = `
-    <iframe
-      src="${src}"
-      width="340"
-      height="660"
-      style="border:none;"
-      allow="fullscreen"
-    ></iframe>
-  `.trim();
-
-  setAdCode(iframe);
-}
-
-
-  const { data: modules, error } = await supabase
-    .from('Modules')
-    .select('id')
-    .eq('survey_id', selectedSurvey.id);
-
-  if (error || !modules?.length) {
-    toast.error('No modules found for this survey');
-    return;
-  }
-
-  const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-  const moduleId = selectedModule.id;
-  const creativeId = selectedCreative?.id;
-const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
-
-const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
-
-  const iframe = `
-  <iframe
-    src="${src}"
-    width="340"
-    height="660"
-    style="border:none;"
-    allow="fullscreen"
-  ></iframe>
-`.trim();
-
-  setAdCode(iframe);
-}
 
 
   async function simulateCompletes() {
@@ -434,6 +396,7 @@ const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.i
   </div>
 ) : adCode ? (
   <iframe
+    ref={iframeRef}
     src={adCode.match(/src="([^"]+)"/)?.[1] || ''}
     width="340"
     height="660"
