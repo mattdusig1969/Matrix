@@ -63,10 +63,10 @@ useEffect(() => {
 
   useEffect(() => {
   if (iframeRef.current && selectedCreative) {
-    iframeRef.current.contentWindow.postMessage({
-      type: 'update-creative',
-      creativeId: selectedCreative.id,
-    }, '*');
+    const currentSrc = iframeRef.current.src;
+    const newSrc = new URL(currentSrc);
+    newSrc.searchParams.set('creative_id', selectedCreative.id);
+    iframeRef.current.src = newSrc.toString();
   }
 }, [selectedCreative]);
 
@@ -162,26 +162,21 @@ useEffect(() => {
     const selectedModule = modules[Math.floor(Math.random() * modules.length)];
     const moduleId = selectedModule.id;
     const creativeId = selectedCreative?.id;
+    const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
 
-    if (iframeRef.current) {
-      iframeRef.current.contentWindow.postMessage({
-        type: 'update-creative',
-        creativeId: creativeId,
-      }, '*');
-    } else {
-      const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
-      const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
-      const iframe = `
-        <iframe
-          src="${src}"
-          width="340"
-          height="660"
-          style="border:none;"
-          allow="fullscreen"
-        ></iframe>
-      `.trim();
-      setAdCode(iframe);
-    }
+    const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
+
+    const iframe = `
+      <iframe
+        src="${src}"
+        width="340"
+        height="660"
+        style="border:none;"
+        allow="fullscreen"
+      ></iframe>
+    `.trim();
+
+    setAdCode(iframe);
   }
 
 
