@@ -61,7 +61,19 @@ useEffect(() => {
   }
 
   useEffect(() => {
-  // Styles are now handled within the iframe
+  // Remove any previous styles
+  document.querySelectorAll('style[data-preview-style]').forEach(el => el.remove());
+
+  // Only inject if valid css_code
+  if (selectedCreative?.css_code?.trim()) {
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      const styleTag = document.createElement('style');
+      styleTag.setAttribute('data-preview-style', 'true');
+      styleTag.innerHTML = selectedCreative.css_code;
+      document.head.appendChild(styleTag);
+    });
+  }
 }, [selectedCreative]);
 
 
