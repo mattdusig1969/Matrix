@@ -262,7 +262,6 @@ setResponses(existingUser.demo_attributes || {});
   <div
     key={creative_id}
     style={{
-      pointerEvents: 'none',
       position: 'relative',
       zIndex: 0,
       marginBottom: '12px'
@@ -351,7 +350,6 @@ setResponses(existingUser.demo_attributes || {});
   <div
     key={creative_id}
     style={{
-      pointerEvents: 'none',
       position: 'relative',
       zIndex: 0,
       marginBottom: '12px'
