@@ -1,0 +1,30 @@
+node_modules
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+.next/
+.DS_Store
+.env*
+*.log
+
+# testing
+coverage/
+
+# production
+.next/
+out/
+
+# misc
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+
+# vercel / deployment
+.vercel/
+.firebase/
+
+# system files
+Thumbs.db
