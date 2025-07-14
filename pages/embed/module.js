@@ -57,11 +57,10 @@ styleTag.setAttribute('data-injected-creative-style', 'true');
 styleTag.innerHTML = data.css_code;
 document.head.appendChild(styleTag);
 
-// Delay setting HTML slightly to allow CSS to fully apply
-setTimeout(() => {
+// 3. Set HTML AFTER DOM paints (ensures CSS applies)
+requestAnimationFrame(() => {
   setCreativeHTML(data.html_code);
-}, 0);
-
+});
 
   };
 
@@ -92,11 +91,9 @@ setTimeout(() => {
       .eq('user_session_id', sessionId)
       .maybeSingle();
 
-      if (existingUser) {
-  setUserExists(true);
-console.log("✅ userExists set to true");
-setResponses(existingUser.demo_attributes || {});
-
+    if (existingUser) {
+      setUserExists(true);
+      setResponses(existingUser.demo_attributes || {});
     } else {
       const { data: surveyData } = await supabase
         .from('Surveys')
@@ -148,33 +145,17 @@ setResponses(existingUser.demo_attributes || {});
     return Object.entries(targeting).every(([key, accepted]) => accepted.includes(user[key]));
   }
 
-  async function fetchModuleQuestions() {
-  const { data, error } = await supabase
-  .from('questions')
-  .select('id, module_id, question_text, answer_option, question_order')
-  .eq('module_id', module_id)
-  .order('question_order', { ascending: true })
-  .then(({ data, error }) => {
-    if (error) {
-      console.error("❌ Failed to load questions:", error);
-    } else {
-      console.log("✅ Loaded questions:", data);
-      const formatted = data.map((q) => ({ ...q, answer_options: q.answer_option }));
-      setQuestions(formatted);
-    }
-  });
-
-
-  if (error) {
-    console.error("❌ Error loading questions:", error);
-    return;
+  function fetchModuleQuestions() {
+    supabase
+      .from('questions')
+      .select('id, module_id, question_text, answer_option, question_order')
+      .eq('module_id', module_id)
+      .order('question_order', { ascending: true })
+      .then(({ data }) => {
+        const formatted = data.map((q) => ({ ...q, answer_options: q.answer_option }));
+        setQuestions(formatted);
+      });
   }
-
-  console.log("✅ Loaded questions:", data);
-  const formatted = data.map((q) => ({ ...q, answer_options: q.answer_option }));
-  setQuestions(formatted);
-}
-
 
   async function handleDemoSubmit() {
     await supabase.from('usersessions').insert({
@@ -190,10 +171,6 @@ setResponses(existingUser.demo_attributes || {});
   }
 
   async function handleSubmit() {
-    console.log("Selected answer:", currentAnswer);
-    console.log("✅ Submitting answer for:", questions[currentIndex]);
-    console.log("Current question list:", questions);
-    console.log("🔘 Current selected answer:", currentAnswer);
     if (!currentAnswer.trim()) return;
     const currentQuestion = questions[currentIndex];
 
@@ -250,37 +227,21 @@ setResponses(existingUser.demo_attributes || {});
   }
 
   if (showDemoPrompt && targetingFields.length > 0) {
-  const grouped = [];
-  for (let i = 0; i < targetingFields.length; i += 2) {
-    grouped.push(targetingFields.slice(i, i + 2));
-  }
-  const currentGroup = grouped[demoPageIndex] || [];
+    const grouped = [];
+    for (let i = 0; i < targetingFields.length; i += 2) {
+      grouped.push(targetingFields.slice(i, i + 2));
+    }
+    const currentGroup = grouped[demoPageIndex] || [];
 
-  return (
-    <div className="p-4 text-sm">
-      {creativeHTML && (
+    return (
+      <div className="p-4 text-sm">
+        {creativeHTML && (
   <div
-    key={creative_id}
-    style={{
-      position: 'relative',
-      zIndex: 0,
-      marginBottom: '12px'
-    }}
+    className="mb-2"
     dangerouslySetInnerHTML={{ __html: creativeHTML }}
   />
 )}
 
-
-      <div className="text-lg font-bold text-left mb-4">
-        Make Money – Short Poll!
-      </div>
-
-      {currentGroup.map((field) => (
-        <div key={field.field_name} className="mb-6">
-          <div className="font-medium mb-2">{field.field_name}</div>
-          {field.values.
-
-  
         <div className="text-lg font-bold text-left mb-4">
           Make Money – Short Poll!
         </div>
@@ -305,7 +266,7 @@ setResponses(existingUser.demo_attributes || {});
                 <label key={val} className="flex items-center mb-2">
                   <input
                     type="radio"
-                    name={`demo_${field.field_name}`}
+                    name={field.field_name}
                     value={val}
                     checked={responses[field.field_name] === val}
                     onChange={() =>
@@ -342,18 +303,13 @@ setResponses(existingUser.demo_attributes || {});
   if (!currentQuestion) return <p className="p-2 text-xs">Loading current question...</p>;
 
   return (
-  <div className="p-2 mx-auto text-xs border shadow relative z-10"
-  style={{ width: '320px', height: '600px', overflow: 'auto' }}>
-
-    {/* ✅ VISUAL HEADER ONLY — NOT INTERACTIVE */}
+  <div className="p-2 mx-auto text-xs border shadow"
+    style={{ width: '320px', height: '600px', overflow: 'hidden' }}>
+    
+    {/* ✅ Add this below */}
     {creativeHTML && (
   <div
-    key={creative_id}
-    style={{
-      position: 'relative',
-      zIndex: 0,
-      marginBottom: '12px'
-    }}
+    className="mb-2"
     dangerouslySetInnerHTML={{ __html: creativeHTML }}
   />
 )}
@@ -387,15 +343,12 @@ setResponses(existingUser.demo_attributes || {});
           <li key={i} className="flex items-center">
             <div className="w-5 flex justify-center">
               <input
-            type="radio"
-            name="answer"
-            value={opt}
-            checked={currentAnswer === opt}
-            onChange={() => {
-              console.log("Clicked option:", opt);
-              setCurrentAnswer(opt);
-            }}
-          />
+                type="radio"
+                name="answer"
+                value={opt}
+                checked={currentAnswer === opt}
+                onChange={() => setCurrentAnswer(opt)}
+              />
             </div>
             <span className="ml-2">{opt}</span>
           </li>
