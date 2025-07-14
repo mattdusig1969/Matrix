@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import toast, { Toaster } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,7 +23,6 @@ export default function GenerateAdCodePage() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [creativeVariants, setCreativeVariants] = useState([]);
   const [selectedCreative, setSelectedCreative] = useState(null);
-  const iframeRef = useRef(null);
   const DEFAULT_STYLE = "Style A - Bold & Clean";
 
 
@@ -62,12 +61,7 @@ useEffect(() => {
   }
 
   useEffect(() => {
-  if (iframeRef.current && selectedCreative) {
-    const currentSrc = iframeRef.current.src;
-    const newSrc = new URL(currentSrc);
-    newSrc.searchParams.set('creative_id', selectedCreative.id);
-    iframeRef.current.src = newSrc.toString();
-  }
+  // Styles are now handled within the iframe
 }, [selectedCreative]);
 
 
@@ -144,40 +138,77 @@ useEffect(() => {
   }
 
   async function generateIframeCode() {
-    if (!selectedSurvey?.id) {
-      toast.error('Please select a survey');
-      return;
-    }
-
-    const { data: modules, error } = await supabase
-      .from('Modules')
-      .select('id')
-      .eq('survey_id', selectedSurvey.id);
-
-    if (error || !modules?.length) {
-      toast.error('No modules found for this survey');
-      return;
-    }
-
-    const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-    const moduleId = selectedModule.id;
-    const creativeId = selectedCreative?.id;
-    const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
-
-    const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
-
-    const iframe = `
-      <iframe
-        src="${src}"
-        width="340"
-        height="660"
-        style="border:none;"
-        allow="fullscreen"
-      ></iframe>
-    `.trim();
-
-    setAdCode(iframe);
+  if (!selectedSurvey?.id) {
+    toast.error('Please select a survey');
+    return;
   }
+
+  async function generateIframeCode() {
+  if (!selectedSurvey?.id) {
+    toast.error('Please select a survey');
+    return;
+  }
+
+  const { data: modules, error } = await supabase
+    .from('Modules')
+    .select('id')
+    .eq('survey_id', selectedSurvey.id);
+
+  if (error || !modules?.length) {
+    toast.error('No modules found for this survey');
+    return;
+  }
+
+  const selectedModule = modules[Math.floor(Math.random() * modules.length)];
+  const moduleId = selectedModule.id;
+  const creativeId = selectedCreative?.id;
+  const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
+
+  const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
+
+  const iframe = `
+    <iframe
+      src="${src}"
+      width="340"
+      height="660"
+      style="border:none;"
+      allow="fullscreen"
+    ></iframe>
+  `.trim();
+
+  setAdCode(iframe);
+}
+
+
+  const { data: modules, error } = await supabase
+    .from('Modules')
+    .select('id')
+    .eq('survey_id', selectedSurvey.id);
+
+  if (error || !modules?.length) {
+    toast.error('No modules found for this survey');
+    return;
+  }
+
+  const selectedModule = modules[Math.floor(Math.random() * modules.length)];
+  const moduleId = selectedModule.id;
+  const creativeId = selectedCreative?.id;
+const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
+
+const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
+
+  const iframe = `
+  <iframe
+    src="${src}"
+    width="340"
+    height="660"
+    style="border:none;"
+    allow="fullscreen"
+  ></iframe>
+`.trim();
+
+  setAdCode(iframe);
+}
 
 
   async function simulateCompletes() {
@@ -391,7 +422,6 @@ useEffect(() => {
   </div>
 ) : adCode ? (
   <iframe
-    ref={iframeRef}
     src={adCode.match(/src="([^"]+)"/)?.[1] || ''}
     width="340"
     height="660"
