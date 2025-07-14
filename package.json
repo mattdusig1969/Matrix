@@ -1,0 +1,33 @@
+{
+  "name": "admin-dashboard-tailwind-starter",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.2",
+    "chart.js": "^4.5.0",
+    "date-fns": "^4.1.0",
+    "file-saver": "^2.0.5",
+    "lucide-react": "^0.525.0",
+    "next": "^14.1.0",
+    "openai": "^5.8.2",
+    "papaparse": "^5.5.3",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.5.2",
+    "recharts": "^3.1.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.4.1",
+    "typescript": "5.8.3"
+  }
+}
