@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+import { parseStyle } from '../../lib/styles';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -50,26 +51,8 @@ export default function EmbeddedModule() {
         return;
       }
 
-      if (data.css_code) {
-        const response = await fetch('/api/parse-css', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ css: data.css_code }),
-        });
-
-        if (response.ok) {
-          const parsedCss = await response.json();
-          setCreativeStyle(parsedCss);
-        } else {
-          console.error('❌ Error parsing CSS:', await response.json());
-          setCreativeStyle({});
-        }
-      } else {
-        setCreativeStyle({});
-      }
-
+      const parsedCss = data.css_code ? parseStyle(data.css_code) : {};
+      setCreativeStyle(parsedCss);
       setCreativeHtml(data.html_code || '');
     };
 
