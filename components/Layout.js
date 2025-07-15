@@ -1,6 +1,6 @@
 // components/Layout.js
 import Head from 'next/head';
-import Sidebar from './Sidebar';
+import Sidebar from './sidebar';
 
 export default function Layout({ children, title = 'Matrix Sampling' }) {
   return (

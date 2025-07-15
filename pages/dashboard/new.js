@@ -12,6 +12,9 @@ export default function NewSurveyPage() {
   const router = useRouter();
 
   const [clients, setClients] = useState([]);
+  const [surveys, setSurveys] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
     client_id: '',
     title: '',
@@ -25,6 +28,11 @@ export default function NewSurveyPage() {
 
   const AGE_OPTIONS = ['18-24', '25-34', '35-44', '45+'];
   const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+  const STATUS_OPTIONS = ['All', 'Live', 'Paused', 'Closed', 'Completed'];
+
+  const filteredSurveys = surveys.filter(survey =>
+    statusFilter === 'All' || survey.status === statusFilter
+  );
 
   useEffect(() => {
     async function fetchClients() {
