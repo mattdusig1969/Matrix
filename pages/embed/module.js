@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+import { parse } from 'css-what';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -13,7 +14,7 @@ export default function EmbeddedModule() {
   const module_id = router.query?.module_id;
   const survey_id = router.query?.survey_id;
   const creative_id = router.query?.creative_id;
-  const [creativeStyle, setCreativeStyle] = useState('');
+  const [creativeStyle, setCreativeStyle] = useState({});
   const [creativeHtml, setCreativeHtml] = useState('');
   const [sessionId, setSessionId] = useState(null);
   const [userExists, setUserExists] = useState(false);
@@ -34,15 +35,25 @@ export default function EmbeddedModule() {
   }
 
   function parseStyle(cssText) {
-    const style = {};
-    cssText.split(';').forEach(rule => {
-      const parts = rule.split(':');
+    const styles = {};
+    const rules = cssText.split('}');
+    rules.forEach(rule => {
+      const parts = rule.split('{');
       if (parts.length === 2) {
-        const key = parts[0].trim().replace(/-([a-z])/g, g => g[1].toUpperCase());
-        style[key] = parts[1].trim();
+        const selector = parts[0].trim();
+        const declarations = parts[1].trim();
+        const style = {};
+        declarations.split(';').forEach(declaration => {
+          const declParts = declaration.split(':');
+          if (declParts.length === 2) {
+            const key = declParts[0].trim().replace(/-([a-z])/g, g => g[1].toUpperCase());
+            style[key] = declParts[1].trim();
+          }
+        });
+        styles[selector] = style;
       }
     });
-    return style;
+    return styles;
   }
 
   useEffect(() => {
@@ -320,7 +331,7 @@ export default function EmbeddedModule() {
 
   return (
   <>
-    <div style={{ ...creativeStyle, width: '320px', height: '600px', overflow: 'hidden' }}>
+    <div style={{ ...creativeStyle['.survey-container'], width: '320px', height: '600px', overflow: 'hidden' }}>
 
 
     {/* Inject optional HTML block from creativeVariants */}
@@ -329,7 +340,7 @@ export default function EmbeddedModule() {
     )}
 
     {/* Main Content Box */}
-    <div className="p-2 mx-auto text-xs border shadow">
+    <div className="p-2 mx-auto text-xs border shadow" style={creativeStyle['.content-box']}>
 
       <button
         onClick={resetSession}
@@ -339,28 +350,28 @@ export default function EmbeddedModule() {
       </button>
 
       {currentIndex === 0 && (
-        <div className="text-lg font-bold text-left mb-2">
+        <div className="text-lg font-bold text-left mb-2" style={creativeStyle['h1']}>
           Make Money – Short Poll!
         </div>
       )}
 
       {/* Progress Bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-3">
+      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-3" style={creativeStyle['.progress-bar']}>
         <div
           className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-          style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+          style={{ ...creativeStyle['.progress-bar-inner'], width: `${((currentIndex + 1) / questions.length) * 100}%` }}
         ></div>
       </div>
 
       {/* Question Text */}
-      <div className="font-semibold text-lg mb-2 leading-snug break-words whitespace-normal">
+      <div className="font-semibold text-lg mb-2 leading-snug break-words whitespace-normal" style={creativeStyle['.question-text']}>
         {currentQuestion.question_text}
       </div>
 
       {/* Answer Options */}
       <ul className="space-y-2">
         {(currentQuestion.answer_options || []).map((opt, i) => (
-          <li key={i} className="flex items-center">
+          <li key={i} className="flex items-center" style={creativeStyle['.answer-option']}>
             <div className="w-5 flex justify-center">
               <input
                 type="radio"
@@ -379,6 +390,7 @@ export default function EmbeddedModule() {
       <button
         className="mt-3 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
         onClick={handleSubmit}
+        style={creativeStyle['.submit-button']}
       >
         Submit
                </button>
