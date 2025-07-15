@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
-const supabase = createClient(
-  'https://yyimqdffhozncrqjmpqh.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aW1xZGZmaG96bmNycWptcHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Njc1OTksImV4cCI6MjA2NzU0MzU5OX0.IBLihUKFXvtvIUVA3C7bPoQHfiuQEEdmwgj930RRpFs'
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function EmbeddedModule() {
   const router = useRouter();
@@ -58,26 +58,6 @@ useEffect(() => {
 }, [creative_id]);
 
 
-useEffect(() => {
-  async function fetchCreative() {
-    if (!creative_id) return;
-
-    const { data, error } = await supabase
-      .from('CreativeVariants')
-      .select('html, css')
-      .eq('id', creative_id)
-      .single();
-
-    if (error) {
-      console.error('Error fetching creative:', error);
-    } else {
-      setCreativeHtml(data.html);
-      setCreativeStyle(data.css);
-    }
-  }
-
-  fetchCreative();
-}, [creative_id]); // ← re-run whenever creative_id changes
 
 
 
