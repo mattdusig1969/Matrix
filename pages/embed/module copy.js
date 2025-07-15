@@ -3,18 +3,20 @@ import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
-const supabase = createClient(
-  'https://yyimqdffhozncrqjmpqh.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aW1xZGZmaG96bmNycWptcHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Njc1OTksImV4cCI6MjA2NzU0MzU5OX0.IBLihUKFXvtvIUVA3C7bPoQHfiuQEEdmwgj930RRpFs'
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function EmbeddedModule() {
   const router = useRouter();
-  const module_id = router.query?.module_id;
-  const survey_id = router.query?.survey_id;
-  const creative_id = router.query?.creative_id;
-  const [creativeStyle, setCreativeStyle] = useState('');
-  const [creativeHtml, setCreativeHtml] = useState('');
+  const { module_id, survey_id, age, gender, creative_id } = router.query;
+
+  const [creativeHTML, setCreativeHTML] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [userExists, setUserExists] = useState(false);
   const [responses, setResponses] = useState({});
@@ -33,51 +35,40 @@ export default function EmbeddedModule() {
     window.location.reload();
   }
 
-useEffect(() => {
-  if (!creative_id) return;
-
-  const fetchCreativeData = async () => {
-    const { data, error } = await supabase
-      .from('creativevariants')
-      .select('html_code, css_code')
-      .eq('id', creative_id)
-      .single();
-
-    if (error) {
-      console.error('❌ Error loading creative style:', error);
-      setCreativeStyle('');
-      setCreativeHtml('');
-      return;
-    }
-
-    setCreativeStyle(data.css_code || '');
-    setCreativeHtml(data.html_code || '');
-  };
-
-  fetchCreativeData();
-}, [creative_id]);
-
-
-useEffect(() => {
-  async function fetchCreative() {
+  useEffect(() => {
+  const fetchCreative = async () => {
     if (!creative_id) return;
 
     const { data, error } = await supabase
       .from('CreativeVariants')
-      .select('html, css')
+      .select('html_code, css_code')
       .eq('id', creative_id)
       .single();
 
-    if (error) {
-      console.error('Error fetching creative:', error);
-    } else {
-      setCreativeHtml(data.html);
-      setCreativeStyle(data.css);
-    }
-  }
+    if (error || !data) return;
+
+    // Remove previously injected styles
+    document.querySelectorAll('style[data-injected-creative-style]').forEach(el => el.remove());
+
+    // Inject CSS
+    // 1. Remove old styles first
+document.querySelectorAll('style[data-injected-creative-style]').forEach(el => el.remove());
+
+// 2. Inject CSS synchronously
+const styleTag = document.createElement('style');
+styleTag.setAttribute('data-injected-creative-style', 'true');
+styleTag.innerHTML = data.css_code;
+document.head.appendChild(styleTag);
+
+// 3. Set HTML AFTER DOM paints (ensures CSS applies)
+requestAnimationFrame(() => {
+  setCreativeHTML(data.html_code);
+});
+
+  };
 
   fetchCreative();
-}, [creative_id]); // ← re-run whenever creative_id changes
+}, [creative_id]);
 
 
 
@@ -97,13 +88,11 @@ useEffect(() => {
   }, [module_id, userExists]);
 
   async function checkUserSession() {
-    const { data: existingUser, error } = await supabase
+    const { data: existingUser } = await supabase
       .from('usersessions')
       .select('*')
       .eq('user_session_id', sessionId)
       .maybeSingle();
-
-    if (error) console.error('❌ usersessions query error:', error);
 
     if (existingUser) {
       setUserExists(true);
@@ -123,8 +112,8 @@ useEffect(() => {
       const allFields = await Promise.all(
         fieldNames.map(async (field_name) => {
           let sourceTable = 'demoattributes';
-          if (['State', 'Country'].includes(field_name)) sourceTable = 'geoattributes';
-          if (['Values', 'Lifestyle'].includes(field_name)) sourceTable = 'psychoattributes';
+          if (["State", "Country"].includes(field_name)) sourceTable = 'geoattributes';
+          if (["Values", "Lifestyle"].includes(field_name)) sourceTable = 'psychoattributes';
 
           const { data } = await supabase
             .from(sourceTable)
@@ -132,7 +121,7 @@ useEffect(() => {
             .eq('field_name', field_name)
             .eq('country_id', country_id);
 
-          const values = data?.map((row) => row.value).filter((v, i, a) => a.indexOf(v) === i).sort() || [];
+          const values = data?.map(r => r.value).filter(Boolean) || [];
           return { field_name, values };
         })
       );
@@ -143,16 +132,12 @@ useEffect(() => {
       if (isSimulated) {
         const sim = {};
         allFields.forEach(({ field_name, values }) => {
-          const random = values[Math.floor(Math.random() * values.length)];
-          sim[field_name] = random;
+          sim[field_name] = values[Math.floor(Math.random() * values.length)];
         });
         await supabase.from('usersessions').insert({ user_session_id: sessionId, demo_attributes: sim });
         setResponses(sim);
-        if (!matchesTargeting(sim, targeting)) {
-          setShowEnd(true);
-        } else {
-          setUserExists(true);
-        }
+        setUserExists(matchesTargeting(sim, targeting));
+        if (!matchesTargeting(sim, targeting)) setShowEnd(true);
       } else {
         setShowDemoPrompt(true);
       }
@@ -169,8 +154,7 @@ useEffect(() => {
       .select('id, module_id, question_text, answer_option, question_order')
       .eq('module_id', module_id)
       .order('question_order', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) return console.error('❌ Supabase error:', error);
+      .then(({ data }) => {
         const formatted = data.map((q) => ({ ...q, answer_options: q.answer_option }));
         setQuestions(formatted);
       });
@@ -191,19 +175,16 @@ useEffect(() => {
 
   async function handleSubmit() {
     if (!currentAnswer.trim()) return;
-
     const currentQuestion = questions[currentIndex];
 
-    await supabase.from('ModuleResponses').insert([
-      {
-        module_id,
-        question_order: currentIndex,
-        question_text: currentQuestion.question_text,
-        selected_answer: currentAnswer,
-        user_session_id: sessionId,
-        demo_attributes: responses,
-      },
-    ]);
+    await supabase.from('ModuleResponses').insert({
+      module_id,
+      question_order: currentIndex,
+      question_text: currentQuestion.question_text,
+      selected_answer: currentAnswer,
+      user_session_id: sessionId,
+      demo_attributes: responses,
+    });
 
     setSubmittedAnswers([...submittedAnswers, currentAnswer]);
     setCurrentAnswer('');
@@ -227,7 +208,7 @@ useEffect(() => {
     }
   }
 
-  if (!sessionId || (sessionId && !userExists && !showDemoPrompt)) {
+  if (!sessionId || (!userExists && !showDemoPrompt)) {
     return <p className="p-2 text-xs">Initializing session...</p>;
   }
 
@@ -237,31 +218,33 @@ useEffect(() => {
 
   if (showEnd) {
     return (
-      <div className="p-2 text-center text-lg">
-        🎉 Thank you! <br />
-        Now register to get paid at SurveySite.com
-        <div className="mt-3">
-          <button
-            onClick={resetSession}
-            className="px-2 py-1 text-xs bg-red-500 text-white rounded"
-          >
-            🔁 Reset Session
-          </button>
-        </div>
+      <div className="p-4 text-sm">
+              <p className="text-center text-green-700 font-bold">
+          ✅ Thank you for your response!
+        </p>
+        <button onClick={resetSession} className="mt-4 text-xs text-blue-600 underline">
+          Start Over
+        </button>
       </div>
     );
   }
 
-  if (showDemoPrompt && targetingFields?.length > 0) {
+  if (showDemoPrompt && targetingFields.length > 0) {
     const grouped = [];
     for (let i = 0; i < targetingFields.length; i += 2) {
       grouped.push(targetingFields.slice(i, i + 2));
     }
-
     const currentGroup = grouped[demoPageIndex] || [];
 
     return (
       <div className="p-4 text-sm">
+        {creativeHTML && (
+  <div
+    className="mb-2"
+    dangerouslySetInnerHTML={{ __html: creativeHTML }}
+  />
+)}
+
         <div className="text-lg font-bold text-left mb-4">
           Make Money – Short Poll!
         </div>
@@ -320,53 +303,44 @@ useEffect(() => {
   }
 
   const currentQuestion = questions[currentIndex];
-
-  if (!currentQuestion) {
-    return <p className="p-2 text-xs">Loading current question...</p>;
-  }
+  if (!currentQuestion) return <p className="p-2 text-xs">Loading current question...</p>;
 
   return (
-  <>
-    <div style={{ width: '320px', height: '600px', overflow: 'hidden' }}>
+  <div className="p-2 mx-auto text-xs border shadow"
+    style={{ width: '320px', height: '600px', overflow: 'hidden' }}>
+    
+    {/* ✅ Add this below */}
+    {creativeHTML && (
+  <div
+    className="mb-2"
+    dangerouslySetInnerHTML={{ __html: creativeHTML }}
+  />
+)}
 
-    {/* Inject CSS styles from creativeVariants */}
-    {creativeStyle && <style dangerouslySetInnerHTML={{ __html: creativeStyle }} />}
 
-    {/* Inject optional HTML block from creativeVariants */}
-    {creativeHtml && (
-      <div dangerouslySetInnerHTML={{ __html: creativeHtml }} />
-    )}
+    <button
+      onClick={resetSession}
+      className="mb-2 px-2 py-1 text-xs bg-red-500 text-white rounded"
+    >
+      🔁 Reset Session
+    </button>
 
-    {/* Main Content Box */}
-    <div className="p-2 mx-auto text-xs border shadow">
+    <div className="text-lg font-bold text-left mb-2">
+      Make Money – Short Poll!
+    </div>
 
-      <button
-        onClick={resetSession}
-        className="mb-2 px-2 py-1 text-xs bg-red-500 text-white rounded"
-      >
-        🔁 Reset Session
-      </button>
+    <div className="w-full bg-gray-200 rounded-full h-2.5 mb-3">
+      <div
+        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+        style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+      ></div>
+    </div>
 
-      {currentIndex === 0 && (
-        <div className="text-lg font-bold text-left mb-2">
-          Make Money – Short Poll!
-        </div>
-      )}
 
-      {/* Progress Bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-3">
-        <div
-          className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-          style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-        ></div>
-      </div>
-
-      {/* Question Text */}
       <div className="font-semibold text-lg mb-2 leading-snug break-words whitespace-normal">
         {currentQuestion.question_text}
       </div>
 
-      {/* Answer Options */}
       <ul className="space-y-2">
         {(currentQuestion.answer_options || []).map((opt, i) => (
           <li key={i} className="flex items-center">
@@ -384,20 +358,16 @@ useEffect(() => {
         ))}
       </ul>
 
-      {/* Submit Button */}
       <button
         className="mt-3 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
         onClick={handleSubmit}
       >
         Submit
-               </button>
-                </div> {/* close inner .p-2 box */}
-      </div> {/* close outer wrapper */}
-    </>
+      </button>
+    </div>
   );
 }
 
 EmbeddedModule.getLayout = function PageLayout(page) {
-
   return page;
 };

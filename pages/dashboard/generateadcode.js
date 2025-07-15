@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import ModuleProgressChart from '../../components/ModuleProgressChart';
 import ModuleCompletionMeter from '../../components/ModuleCompletionMeter';
 
+
 const supabase = createClient(
   'https://yyimqdffhozncrqjmpqh.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aW1xZGZmaG96bmNycWptcHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Njc1OTksImV4cCI6MjA2NzU0MzU5OX0.IBLihUKFXvtvIUVA3C7bPoQHfiuQEEdmwgj930RRpFs'
@@ -24,19 +25,16 @@ export default function GenerateAdCodePage() {
   const [creativeVariants, setCreativeVariants] = useState([]);
   const [selectedCreative, setSelectedCreative] = useState(null);
   const DEFAULT_STYLE = "Style A - Bold & Clean";
+  const [selectedCreativeId, setSelectedCreativeId] = useState('');
+  const [selectedModuleId, setSelectedModuleId] = useState('');
 
-
-useEffect(() => {
-  if (selectedSurvey) {
-    const srcUrl = `https://yourdomain.com/embed/module?survey_id=${selectedSurvey}`;
-    const iframeCode = `<iframe src="${srcUrl}" width="340" height="660" frameborder="0" scrolling="no" style="border:none;"></iframe>`;
-    setAdCode(iframeCode);
-  }
-}, [selectedSurvey]);
 
 
   useEffect(() => {
     fetchSurveys();
+  }, []);
+
+  useEffect(() => {
     fetchCreativeVariants();
   }, []);
 
@@ -45,46 +43,52 @@ useEffect(() => {
     const defaultCreative = creativeVariants.find(cv => cv.name === DEFAULT_STYLE);
     if (defaultCreative) {
       setSelectedCreative(defaultCreative);
+      setSelectedCreativeId(defaultCreative.id); // Add this line
     }
   }
 }, [selectedSurvey, creativeVariants]);
 
+useEffect(() => {
+  if (selectedSurvey?.id && selectedCreativeId) {
+    supabase
+      .from('Modules')
+      .select('id')
+      .eq('survey_id', selectedSurvey.id)
+      .then(({ data, error }) => {
+        if (data?.length) {
+          const selectedModule = data[Math.floor(Math.random() * data.length)];
+          const creativeParam = selectedCreativeId ? `&creative_id=${selectedCreativeId}` : '';
+          const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
+          setSelectedModuleId(selectedModule.id);
+          setAdCode(src);
+        }
+      });
+  }
+}, [selectedSurvey?.id, selectedCreativeId]);
+
+
+  async function fetchCreativeVariants() {
+  const { data, error } = await supabase
+    .from('creativevariants')
+    .select('*')
+    .order('name');
+  if (error) toast.error('Failed to load design styles');
+  else setCreativeVariants(data);
+}
 
   async function fetchSurveys() {
     const { data, error } = await supabase
       .from('Surveys')
       .select('id, title, target_n, country_id')
-      .eq('status', 'Live');
+      .eq('status', 'Live')
+      .limit(1000);
 
     if (error) toast.error('Failed to load surveys');
     else setSurveys(data);
   }
 
-  useEffect(() => {
-  // Remove any previous styles
-  document.querySelectorAll('style[data-preview-style]').forEach(el => el.remove());
-
-  // Only inject if valid css_code
-  if (selectedCreative?.css_code?.trim()) {
-    // Use requestAnimationFrame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      const styleTag = document.createElement('style');
-      styleTag.setAttribute('data-preview-style', 'true');
-      styleTag.innerHTML = selectedCreative.css_code;
-      document.head.appendChild(styleTag);
-    });
-  }
-}, [selectedCreative]);
-
-
-  async function fetchCreativeVariants() {
-    const { data, error } = await supabase.from('creativevariants').select('*').order('name');
-    if (error) toast.error('Failed to load design styles');
-    else setCreativeVariants(data);
-  }
-
   async function fetchFields(countryId) {
-    const [demo, geo, psycho] = await Promise.all([
+    const [demoRaw, geoRaw, psychoRaw] = await Promise.all([
       supabase.from('demoattributes').select('*').eq('country_id', countryId),
       supabase.from('geoattributes').select('*').eq('country_id', countryId),
       supabase.from('psychoattributes').select('*').eq('country_id', countryId),
@@ -96,46 +100,54 @@ useEffect(() => {
         if (!grouped[item.field_name]) grouped[item.field_name] = new Set();
         grouped[item.field_name].add(item.value);
       });
-      return Object.fromEntries(Object.entries(grouped).map(([key, val]) => [key, [...val]]));
+      return Object.entries(grouped).reduce((acc, [name, values]) => {
+        acc[name] = Array.from(values);
+        return acc;
+      }, {});
     };
 
     setFieldsByCategory({
-      Demographics: groupFields(demo),
-      Geographics: groupFields(geo),
-      Psychographics: groupFields(psycho),
+      Demographics: groupFields(demoRaw),
+      Geographics: groupFields(geoRaw),
+      Psychographics: groupFields(psychoRaw),
     });
   }
 
   async function handleSurveyChange(e) {
-    const survey = surveys.find(s => s.id === e.target.value);
-    if (!survey) return;
+  const selected = surveys.find(s => s.id === e.target.value);
+  if (!selected) return;
 
-    setSelectedSurvey(survey);
-    setSelectedCategory('Demographics');
-    setSelectedField('');
-    setAdCode('');
-    setSimulated(0);
+  setSelectedSurvey(selected);
+  setSelectedCategory('Demographics');
+  setSelectedField('');
+  setAdCode('');
+  setSimulated(0);
 
-    await fetchFields(survey.country_id);
+  await fetchFields(selected.country_id);
 
-    const { data, error } = await supabase
-      .from('Surveys')
-      .select('targeting')
-      .eq('id', survey.id)
-      .single();
+  // Fetch stored targeting
+  const { data, error } = await supabase
+    .from('Surveys')
+    .select('targeting')
+    .eq('id', selected.id)
+    .single();
 
-    if (error) {
-      toast.error('Failed to load targeting data');
-      return;
-    }
-
-    const targeting = data?.targeting || {};
-    const preselected = {};
-    Object.entries(targeting).forEach(([field, values]) => {
-      preselected[field] = values;
-    });
-    setSelectedOptions(preselected);
+  if (error) {
+    toast.error('Failed to load targeting data');
+    return;
   }
+
+  const preselectedOptions = {};
+  const targeting = data?.targeting || {};
+
+  // Directly apply targeting values to selectedOptions state
+  Object.entries(targeting).forEach(([field, values]) => {
+    preselectedOptions[field] = values;
+  });
+
+  setSelectedOptions(preselectedOptions);
+}
+
 
   function toggleOption(field, option) {
     setSelectedOptions(prev => {
@@ -144,7 +156,7 @@ useEffect(() => {
         ...prev,
         [field]: current.includes(option)
           ? current.filter(o => o !== option)
-          : [...current, option],
+          : [...current, option]
       };
     });
   }
@@ -155,12 +167,6 @@ useEffect(() => {
     return;
   }
 
-  async function generateIframeCode() {
-  if (!selectedSurvey?.id) {
-    toast.error('Please select a survey');
-    return;
-  }
-
   const { data: modules, error } = await supabase
     .from('Modules')
     .select('id')
@@ -172,54 +178,13 @@ useEffect(() => {
   }
 
   const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-  const moduleId = selectedModule.id;
+  setSelectedModuleId(selectedModule.id);
   const creativeId = selectedCreative?.id;
   const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
+  const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
 
-  const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
+  setAdCode(src);
 
-  const iframe = `
-    <iframe
-      src="${src}"
-      width="340"
-      height="660"
-      style="border:none;"
-      allow="fullscreen"
-    ></iframe>
-  `.trim();
-
-  setAdCode(iframe);
-}
-
-
-  const { data: modules, error } = await supabase
-    .from('Modules')
-    .select('id')
-    .eq('survey_id', selectedSurvey.id);
-
-  if (error || !modules?.length) {
-    toast.error('No modules found for this survey');
-    return;
-  }
-
-  const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-  const moduleId = selectedModule.id;
-  const creativeId = selectedCreative?.id;
-const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
-
-const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${moduleId}${creativeParam}`;
-
-  const iframe = `
-  <iframe
-    src="${src}"
-    width="340"
-    height="660"
-    style="border:none;"
-    allow="fullscreen"
-  ></iframe>
-`.trim();
-
-  setAdCode(iframe);
 }
 
 
@@ -232,225 +197,293 @@ const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.i
     setIsSimulating(true);
     setSimulated(0);
 
-    const { data: modules } = await supabase
-      .from('Modules')
-      .select('id')
-      .eq('survey_id', selectedSurvey.id);
+    try {
+      const { data: modules } = await supabase
+        .from('Modules')
+        .select('id')
+        .eq('survey_id', selectedSurvey.id);
 
-    const tasks = Array.from({ length: simulateCount }).map(async () => {
-      const module = modules[Math.floor(Math.random() * modules.length)];
-      const sessionId = uuidv4();
+      const tasks = Array.from({ length: simulateCount }).map(async () => {
+        const selectedModule = modules[Math.floor(Math.random() * modules.length)];
+        const sessionId = uuidv4();
 
-      const { data: questions } = await supabase
-        .from('questions')
-        .select('question_order, question_text, answer_option')
-        .eq('module_id', module.id);
+        const { data: questions, error: qError } = await supabase
+          .from('questions')
+          .select('question_order, question_text, answer_option')
+          .eq('module_id', selectedModule.id);
 
-      const responses = questions?.map(q => {
-        const options = typeof q.answer_option === 'string'
-          ? JSON.parse(q.answer_option)
-          : Array.isArray(q.answer_option)
-          ? q.answer_option
-          : [];
+        if (qError || !questions?.length) return;
 
-        const selected = options[Math.floor(Math.random() * options.length)];
+        const responseBatch = questions.map(q => {
+          let options = [];
 
-        return selected ? {
-          id: uuidv4(),
-          module_id: module.id,
-          user_session_id: sessionId,
-          question_order: q.question_order,
-          question_text: q.question_text,
-          selected_answer: selected,
-          completed: true,
-        } : null;
-      }).filter(Boolean);
+          try {
+            options = typeof q.answer_option === 'string'
+              ? JSON.parse(q.answer_option)
+              : Array.isArray(q.answer_option)
+              ? q.answer_option
+              : [];
+          } catch (err) {
+            console.error("❌ Error parsing answer_option:", q.answer_option, err);
+          }
 
-      if (responses.length > 0) {
-        await supabase.from('ModuleResponses').insert(responses);
-        await supabase.from('SurveyCompletions').insert({
-          survey_id: selectedSurvey.id,
-          module_id: module.id,
-          user_session_id: sessionId,
-          demo_attributes: {},
-          geo_attributes: {},
-          psycho_attributes: {},
-        });
-        setSimulated(prev => prev + 1);
-      }
+          const selected = options.length > 0
+            ? options[Math.floor(Math.random() * options.length)]
+            : null;
+
+          return selected ? {
+            id: uuidv4(),
+            module_id: selectedModule.id,
+            user_session_id: sessionId,
+            question_order: q.question_order,
+            question_text: q.question_text,
+            selected_answer: selected,
+            completed: false
+          } : null;
+        }).filter(Boolean);
+
+        if (responseBatch.length > 0) {
+          const insertResult = await supabase
+            .from('ModuleResponses')
+            .insert(responseBatch);
+
+          if (insertResult.error) {
+            console.error('❌ Supabase insert error:', insertResult.error);
+            toast.error('Insert failed. Check console.');
+            return;
+          }
+
+          const { error: updateError } = await supabase
+            .from('ModuleResponses')
+            .update({ completed: true })
+            .eq('user_session_id', sessionId)
+            .eq('module_id', selectedModule.id);
+
+          if (updateError) {
+            console.error('❌ Update failed:', updateError);
+            toast.error('Update failed. Check console.');
+          } else {
+            setSimulated(prev => prev + 1);
+          }
+
+          // Insert to SurveyCompletions if not already present
+const { data: moduleData } = await supabase
+  .from('Modules')
+  .select('survey_id')
+  .eq('id', selectedModule.id)
+  .single();
+
+if (moduleData?.survey_id) {
+  const { error: insertError } = await supabase
+    .from('SurveyCompletions')
+    .insert({
+      survey_id: moduleData.survey_id,
+      module_id: selectedModule.id,
+      user_session_id: sessionId,
+      demo_attributes: {}, // Simulated users have no attributes
+      geo_attributes: {},
+      psycho_attributes: {}
     });
 
-    await Promise.all(tasks);
+  if (insertError) {
+    console.error('❌ SurveyCompletions insert error:', insertError);
+  }
+}
+        }
+      });
+
+      await Promise.all(tasks);
+      toast.success(`✅ Finished simulating ${simulateCount} completes.`);
+    } catch (err) {
+      console.error("❌ Simulation error:", err);
+      toast.error('Simulation error');
+    }
+
     setIsSimulating(false);
-    toast.success(`✅ Finished simulating ${simulateCount} completes.`);
   }
 
-  return (
-    <div className="p-10">
-      <Toaster />
-      <h1 className="text-2xl font-bold mb-6">📢 Generate Ad Code</h1>
+return (
+  <div className="p-10">
+    <Toaster />
+    <h1 className="text-2xl font-bold mb-6">📢 Generate Ad Code</h1>
 
-      {/* Survey Dropdown */}
+    {/* Survey Dropdown */}
+    <div className="bg-white shadow rounded p-6 mb-6">
+      <label className="block font-semibold mb-2">Select Survey</label>
+      <select
+        className="w-full border px-3 py-2 rounded"
+        onChange={handleSurveyChange}
+      >
+        <option value="">— Choose Survey —</option>
+        {surveys.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.title}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Creative Style Dropdown */}
+    {creativeVariants.length > 0 && (
       <div className="bg-white shadow rounded p-6 mb-6">
-        <label className="block font-semibold mb-2">Select Survey</label>
-        <select className="w-full border px-3 py-2 rounded" onChange={handleSurveyChange}>
-          <option value="">— Choose Survey —</option>
-          {surveys.map(s => (
-            <option key={s.id} value={s.id}>{s.title}</option>
+        <label className="block font-semibold mb-2">Select Design Style</label>
+        <select
+          className="w-full border px-3 py-2 rounded"
+          value={selectedCreativeId}
+          onChange={(e) => {
+          setSelectedCreativeId(e.target.value);
+          const selected = creativeVariants.find(cv => cv.id === e.target.value);
+          setSelectedCreative(selected);
+  }}
+        >
+          <option value="">— Choose a Design Style —</option>
+          {creativeVariants.map((cv) => (
+            <option key={cv.id} value={cv.id}>
+              {cv.name}
+            </option>
           ))}
         </select>
       </div>
+    )}
 
-      {/* Targeting */}
-      {selectedSurvey && (
-        <div className="flex gap-6">
-          {/* Left: Category / Fields / Options */}
-          <div className="flex border rounded divide-x bg-white shadow w-full">
-            <div className="w-1/4 p-4 bg-slate-50 border-r">
-              {Object.keys(fieldsByCategory).map(cat => (
-                <div
-                  key={cat}
-                  className={`cursor-pointer py-2 border-b ${selectedCategory === cat ? 'font-bold text-blue-700' : ''}`}
-                  onClick={() => {
-                    setSelectedCategory(cat);
-                    setSelectedField('');
-                  }}
-                >
-                  {cat}
-                </div>
-              ))}
-            </div>
-            <div className="w-1/4 p-4 bg-slate-50 border-r">
-              {Object.keys(fieldsByCategory[selectedCategory] || {}).map(field => (
-                <div
-                  key={field}
-                  className={`cursor-pointer py-2 border-b ${selectedField === field ? 'font-bold text-blue-700' : ''}`}
-                  onClick={() => setSelectedField(field)}
-                >
-                  {field}
-                </div>
-              ))}
-            </div>
-            <div className="w-1/2 p-4 bg-white">
-              {(fieldsByCategory[selectedCategory]?.[selectedField] || []).map(option => (
-                <label key={option} className="flex items-center gap-2 py-1">
-                  <input
-                    type="checkbox"
-                    checked={(selectedOptions[selectedField] || []).includes(option)}
-                    onChange={() => toggleOption(selectedField, option)}
-                    className="h-4 w-4"
-                  />
-                  {option}
-                </label>
-              ))}
-            </div>
+    {/* Targeting UI */}
+    {selectedSurvey && (
+      <div className="flex gap-6">
+        {/* Fields UI */}
+        <div className="flex border rounded divide-x bg-white shadow w-full">
+          {/* Categories */}
+          <div className="w-1/4 p-4 bg-slate-50 border-r">
+            {Object.keys(fieldsByCategory).map((cat) => (
+              <div
+                key={cat}
+                className={`cursor-pointer py-2 border-b hover:bg-slate-100 flex justify-between items-center ${
+                  selectedCategory === cat ? 'font-bold text-blue-700' : ''
+                }`}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setSelectedField('');
+                }}
+              >
+                <span>{cat}</span>
+              </div>
+            ))}
           </div>
 
-          {/* Targeting Summary */}
-          <div className="bg-gray-50 shadow p-4 rounded-md w-80">
-            <h2 className="text-md font-semibold mb-2">Targeting Summary</h2>
-            {Object.keys(selectedOptions).length === 0 ? (
-              <p className="text-sm italic text-gray-500">No attributes selected</p>
-            ) : (
-              Object.entries(selectedOptions).map(([field, values]) => (
-                values.length > 0 && (
-                  <div key={field} className="mb-3">
-                    <div className="font-medium text-sm text-gray-700">{field}</div>
-                    <ul className="ml-3 list-disc text-sm text-gray-800">
-                      {values.map(val => <li key={val}>{val}</li>)}
-                    </ul>
-                  </div>
-                )
-              ))
-            )}
+          {/* Fields */}
+          <div className="w-1/4 p-4 bg-slate-50 border-r">
+            {Object.keys(fieldsByCategory[selectedCategory] || {}).map((field) => (
+              <div
+                key={field}
+                className={`cursor-pointer py-2 border-b hover:bg-slate-100 ${
+                  selectedField === field ? 'font-bold text-blue-700' : ''
+                }`}
+                onClick={() => setSelectedField(field)}
+              >
+                {field}
+              </div>
+            ))}
+          </div>
+
+          {/* Options */}
+          <div className="w-1/2 p-4 bg-white">
+            {(fieldsByCategory[selectedCategory]?.[selectedField] || []).map((option) => (
+              <label key={option} className="flex items-center gap-2 py-1">
+                <input
+                  type="checkbox"
+                  checked={(selectedOptions[selectedField] || []).includes(option)}
+                  onChange={() => toggleOption(selectedField, option)}
+                  className="h-4 w-4"
+                />
+                <span>{option}</span>
+              </label>
+            ))}
           </div>
         </div>
-      )}
 
-      {/* Simulate Button & Generate Ad Code */}
-      <div className="mt-8 bg-white shadow rounded p-6 space-y-4">
-        <label className="block font-semibold">Number of Completes to Simulate</label>
-        <input
-          type="number"
-          min="1"
-          className="border px-3 py-2 rounded w-24"
-          value={simulateCount}
-          onChange={(e) => setSimulateCount(Number(e.target.value))}
-        />
-
-        <div className="flex flex-wrap gap-4 items-center">
-          <button
-            className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-800"
-            disabled={isSimulating}
-            onClick={simulateCompletes}
-          >
-            {isSimulating ? 'Simulating...' : `Simulate ${simulateCount} Completes`}
-          </button>
-          <button
-            className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
-            onClick={generateIframeCode}
-          >
-            🚀 Generate Ad Code
-          </button>
-          <div className="text-sm text-gray-600">Simulated: {simulated}/{simulateCount}</div>
+        {/* Targeting Summary */}
+        <div className="bg-gray-50 shadow p-4 rounded-md w-80">
+          <h2 className="text-md font-semibold mb-2">Targeting Summary</h2>
+          {Object.keys(selectedOptions).length === 0 ? (
+            <p className="text-sm italic text-gray-500">No attributes selected</p>
+          ) : (
+            Object.entries(selectedOptions).map(([field, values]) =>
+              values.length > 0 ? (
+                <div key={field} className="mb-3">
+                  <div className="font-medium text-sm text-gray-700">{field}</div>
+                  <ul className="ml-3 list-disc text-sm text-gray-800">
+                    {values.map((val) => (
+                      <li key={val}>{val}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null
+            )
+          )}
         </div>
       </div>
+    )}
 
-      {/* Creative Styles */}
-      {creativeVariants.length > 0 && (
-        <div className="mt-8 bg-white shadow rounded p-6">
-          <label className="block font-semibold mb-2">Select Design Style</label>
-          <select
-            className="w-full border px-3 py-2 rounded"
-            onChange={(e) => {
-              const cv = creativeVariants.find(cv => cv.id === e.target.value);
-              setSelectedCreative(cv);
-            }}
-          >
-            <option value="">— Choose a Design Style —</option>
-            {creativeVariants.map(cv => (
-              <option key={cv.id} value={cv.id}>{cv.name}</option>
-            ))}
-          </select>
+    {/* Simulate + Generate Buttons */}
+    <div className="mt-8 bg-white shadow rounded p-6 space-y-4">
+      <label className="block font-semibold">Number of Completes to Simulate</label>
+      <input
+        type="number"
+        min="1"
+        className="border px-3 py-2 rounded w-24"
+        value={simulateCount}
+        onChange={(e) => setSimulateCount(Number(e.target.value))}
+      />
+
+      <div className="flex flex-wrap gap-4 items-center">
+        <button
+          className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-800"
+          disabled={isSimulating}
+          onClick={simulateCompletes}
+        >
+          {isSimulating ? 'Simulating...' : `Simulate ${simulateCount} Completes`}
+        </button>
+
+        <button
+          className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
+          onClick={generateIframeCode}
+        >
+          🚀 Generate Ad Code
+        </button>
+
+        <div className="text-sm text-gray-600">
+          Simulated: {simulated}/{simulateCount}
         </div>
-      )}
-
-      {/* Ad Code Preview */}
-      {adCode && (
-        <div className="mt-6">
-          <h3 className="font-semibold mb-2">Ad Code:</h3>
-          <textarea
-            className="w-full border px-3 py-2 text-sm font-mono"
-            rows={5}
-            value={adCode}
-            readOnly
-          />
-          <div className="mt-4">
-            <h4 className="font-semibold mb-1">Live Preview:</h4>
-            <div className="flex gap-6">
-              {selectedCreative?.html_code ? (
-  <div className="w-[340px] h-[660px] overflow-hidden border shadow p-2">
-    <div dangerouslySetInnerHTML={{ __html: selectedCreative.html_code }} />
-  </div>
-) : adCode ? (
-  <iframe
-    src={adCode.match(/src="([^"]+)"/)?.[1] || ''}
-    width="340"
-    height="660"
-    style={{ border: 'none' }}
-    title="Ad Preview"
-  />
-) : null}
-
-              {selectedSurvey && (
-                <div className="flex flex-col gap-6 w-full">
-                  <ModuleCompletionMeter surveyId={selectedSurvey.id} targetN={selectedSurvey.target_n} />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
-  );
-}
+
+    {/* Ad Code Display */}
+    {adCode && (
+      <div className="mt-10">
+        <h3 className="font-semibold mb-2">Ad Code Snippet:</h3>
+        <textarea
+          className="w-full border px-3 py-2 text-sm font-mono"
+          rows={5}
+          value={`<iframe src="${adCode}" width="340" height="660" style="border:none;" allow="fullscreen"></iframe>`}
+          readOnly
+        />
+
+        <h4 className="font-semibold mt-4 mb-1">Live Preview:</h4>
+        <iframe
+          src={adCode}
+          width="340"
+          height="660"
+          style={{ border: 'none' }}
+          title="Ad Preview"
+        />
+
+        <div className="mt-6">
+          <ModuleCompletionMeter
+            surveyId={selectedSurvey.id}
+            targetN={selectedSurvey.target_n}
+          />
+        </div>
+      </div>
+    )}
+    </div> // End of main wrapper
+);
+} // End of function
