@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-import { parse } from 'css-what';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -34,28 +33,6 @@ export default function EmbeddedModule() {
     window.location.reload();
   }
 
-  function parseStyle(cssText) {
-    const styles = {};
-    const rules = cssText.split('}');
-    rules.forEach(rule => {
-      const parts = rule.split('{');
-      if (parts.length === 2) {
-        const selector = parts[0].trim();
-        const declarations = parts[1].trim();
-        const style = {};
-        declarations.split(';').forEach(declaration => {
-          const declParts = declaration.split(':');
-          if (declParts.length === 2) {
-            const key = declParts[0].trim().replace(/-([a-z])/g, g => g[1].toUpperCase());
-            style[key] = declParts[1].trim();
-          }
-        });
-        styles[selector] = style;
-      }
-    });
-    return styles;
-  }
-
   useEffect(() => {
     if (!creative_id) return;
 
@@ -73,8 +50,26 @@ export default function EmbeddedModule() {
         return;
       }
 
-      const parsedCss = data.css_code ? parseStyle(data.css_code) : {};
-      setCreativeStyle(parsedCss);
+      if (data.css_code) {
+        const response = await fetch('/api/parse-css', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ css: data.css_code }),
+        });
+
+        if (response.ok) {
+          const parsedCss = await response.json();
+          setCreativeStyle(parsedCss);
+        } else {
+          console.error('❌ Error parsing CSS:', await response.json());
+          setCreativeStyle({});
+        }
+      } else {
+        setCreativeStyle({});
+      }
+
       setCreativeHtml(data.html_code || '');
     };
 
