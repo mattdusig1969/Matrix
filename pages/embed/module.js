@@ -33,29 +33,42 @@ export default function EmbeddedModule() {
     window.location.reload();
   }
 
-useEffect(() => {
-  if (!creative_id) return;
+  function parseStyle(cssText) {
+    const style = {};
+    cssText.split(';').forEach(rule => {
+      const parts = rule.split(':');
+      if (parts.length === 2) {
+        const key = parts[0].trim().replace(/-([a-z])/g, g => g[1].toUpperCase());
+        style[key] = parts[1].trim();
+      }
+    });
+    return style;
+  }
 
-  const fetchCreativeData = async () => {
-    const { data, error } = await supabase
-      .from('creativevariants')
-      .select('html_code, css_code')
-      .eq('id', creative_id)
-      .single();
+  useEffect(() => {
+    if (!creative_id) return;
 
-    if (error) {
-      console.error('❌ Error loading creative style:', error);
-      setCreativeStyle('');
-      setCreativeHtml('');
-      return;
-    }
+    const fetchCreativeData = async () => {
+      const { data, error } = await supabase
+        .from('creativevariants')
+        .select('html_code, css_code')
+        .eq('id', creative_id)
+        .single();
 
-    setCreativeStyle(data.css_code || '');
-    setCreativeHtml(data.html_code || '');
-  };
+      if (error) {
+        console.error('❌ Error loading creative style:', error);
+        setCreativeStyle({});
+        setCreativeHtml('');
+        return;
+      }
 
-  fetchCreativeData();
-}, [creative_id]);
+      const parsedCss = data.css_code ? parseStyle(data.css_code) : {};
+      setCreativeStyle(parsedCss);
+      setCreativeHtml(data.html_code || '');
+    };
+
+    fetchCreativeData();
+  }, [creative_id]);
 
 
 
@@ -307,10 +320,8 @@ useEffect(() => {
 
   return (
   <>
-    <div style={{ width: '320px', height: '600px', overflow: 'hidden' }}>
+    <div style={{ ...creativeStyle, width: '320px', height: '600px', overflow: 'hidden' }}>
 
-    {/* Inject CSS styles from creativeVariants */}
-    {creativeStyle && <style dangerouslySetInnerHTML={{ __html: creativeStyle }} />}
 
     {/* Inject optional HTML block from creativeVariants */}
     {creativeHtml && (
