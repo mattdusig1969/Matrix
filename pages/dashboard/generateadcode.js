@@ -6,10 +6,10 @@ import ModuleProgressChart from '../../components/ModuleProgressChart';
 import ModuleCompletionMeter from '../../components/ModuleCompletionMeter';
 
 
-const supabase = createClient(
-  'https://yyimqdffhozncrqjmpqh.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aW1xZGZmaG96bmNycWptcHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Njc1OTksImV4cCI6MjA2NzU0MzU5OX0.IBLihUKFXvtvIUVA3C7bPoQHfiuQEEdmwgj930RRpFs'
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function GenerateAdCodePage() {
   const [surveys, setSurveys] = useState([]);
