@@ -130,55 +130,6 @@ export default function SurveysPage() {
   }
 
 
-
-    console.log('Parsed Questions:', questionsToInsert); // ← Add this here
-
-
-    const { error: qError } = await supabase.from('Questions').insert(questionsToInsert);
-  if (qError) {
-    console.error('❌ Insert Questions Error:', qError); // full error object
-    console.log('🧪 Payload Sent to Supabase:', questionsToInsert); // full payload
-    toast.error('Survey saved, but error adding questions.');
-  }
-
-
-    resetForm();
-    fetchSurveys();
-  }
-}
-
-
-  function parseQuestions(raw) {
-  const lines = raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const questions = [];
-  let currentQuestion = null;
-
-  lines.forEach((line) => {
-    if (line.match(/^Q\d*:/)) {
-      if (currentQuestion) {
-        questions.push(currentQuestion);
-      }
-      currentQuestion = {
-        question: line.replace(/^Q\d*:\s*/, ''),  // Strip "Q1:" or "Q:"
-        answers: [],
-      };
-    } else if (line.startsWith('A:') && currentQuestion) {
-      currentQuestion.answers.push(line.replace(/^A:\s*/, ''));  // Strip "A:"
-    }
-  });
-
-  if (currentQuestion) {
-    questions.push(currentQuestion);
-  }
-
-  return questions;
-}
-
-
   function resetForm() {
     setForm({ client_id: '', title: '', description: '', questions: '' });
     setEditingId(null);
