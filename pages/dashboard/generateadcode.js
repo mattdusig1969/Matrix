@@ -1,15 +1,9 @@
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import toast, { Toaster } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import ModuleProgressChart from '../../components/ModuleProgressChart';
 import ModuleCompletionMeter from '../../components/ModuleCompletionMeter';
-
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from '../../lib/supabaseClient';
 
 export default function GenerateAdCodePage() {
   const [surveys, setSurveys] = useState([]);
@@ -58,7 +52,7 @@ useEffect(() => {
         if (data?.length) {
           const selectedModule = data[Math.floor(Math.random() * data.length)];
           const creativeParam = selectedCreativeId ? `&creative_id=${selectedCreativeId}` : '';
-          const src = `${window.location.origin}/embed/survey?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
+          const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
           setSelectedModuleId(selectedModule.id);
           setAdCode(src);
         }
@@ -181,7 +175,7 @@ useEffect(() => {
   setSelectedModuleId(selectedModule.id);
   const creativeId = selectedCreative?.id;
   const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
-  const src = `${window.location.origin}/embed/survey?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
+  const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
 
   setAdCode(src);
 
