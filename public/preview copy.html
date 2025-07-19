@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Preview Frame</title>
+    <style id="dynamic-style"></style>
+  </head>
+  <body>
+    <div id="iframe-content"></div>
+
+    <script>
+      window.addEventListener('message', function (event) {
+        const data = event.data;
+        if (data?.type === 'load-survey') {
+          const container = document.getElementById('iframe-content');
+
+          // Inject styles
+          document.getElementById('dynamic-style').innerHTML = data.css || '';
+
+          // Inject HTML
+          container.innerHTML = data.html || '';
+
+          // Listen for next button
+          const nextBtn = container.querySelector('#next-btn');
+          if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+              parent.postMessage({ type: 'next-question' }, '*');
+            });
+          }
+        }
+      });
+
+      console.log('📤 Sending next-question');
+
+      // Let parent know iframe is ready
+      window.parent.postMessage({ type: 'iframe-ready' }, '*');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Preview Frame</title>
+    <style id="dynamic-style"></style>
+    <script>
+      window.addEventListener('message', (event) => {
+        const { type, html, css } = event.data;
+        if (type === 'load-survey') {
+          document.getElementById('iframe-content').innerHTML = html;
+          document.getElementById('dynamic-style').textContent = css;
+        }
+      });
+
+      // Let the parent know we're ready
+      window.parent.postMessage({ type: 'iframe-ready' }, '*');
+    </script>
+  </head>
+  <body>
+    <div id="iframe-content"></div>
+  </body>
+</html>

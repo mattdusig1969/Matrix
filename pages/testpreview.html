@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Styled Survey Preview</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style id="custom-style"></style>
+</head>
+<body>
+  <div id="creative-container"></div>
+
+  <script>
+let currentQuestionIndex = parseInt(sessionStorage.getItem('qIndex') || '0', 10);
+    let questionList = [];
+
+    function updateSurveyBlock() {
+      const container = document.getElementById('survey-block');
+      if (!container || questionList.length === 0) return;
+
+      const question = questionList[currentQuestionIndex];
+      if (!question) {
+        container.innerHTML = '<p>🎉 Survey complete!</p>';
+        return;
+      }
+
+        const options = question.answer_option || [];
+        const optionsHtml = options.map((opt) => {
+        return `
+            <label style="display:flex; align-items:center; margin-bottom:6px;">
+            <input type="radio" name="answer" value="${opt}" style="margin-right:6px;" />
+            ${opt}
+            </label>
+        `;
+        }).join('');
+
+      const optionsHtml = question.answer_option.map((opt) => {
+        return `
+          <label style="display:flex; align-items:center; margin-bottom:6px;">
+            <input type="radio" name="answer" value="${opt}" style="margin-right:6px;" />
+            ${opt}
+          </label>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div style="font-weight:bold; margin-bottom:8px;">${question.question_text}</div>
+        ${optionsHtml}
+        <button id="next-btn" style="margin-top:10px;padding:5px 10px;background:#007bff;color:#fff;border:none;border-radius:4px;">
+          Next
+        </button>
+      `;
+
+      document.getElementById('next-btn')?.addEventListener('click', () => {
+        currentQuestionIndex++;
+        updateSurveyBlock();
+      });
+    }
+
+    window.addEventListener('message', (event) => {
+      const { html, css, questions } = event.data || {};
+      if (!html || !css) return;
+
+      questionList = questions || [];
+
+      const styleEl = document.getElementById('custom-style');
+      styleEl.innerHTML = css;
+
+      const container = document.getElementById('creative-container');
+      container.innerHTML = html.replace('{{SURVEY_BLOCK}}', '<div id="survey-block"></div>');
+
+      updateSurveyBlock();
+
+      // Respond that iframe is ready
+      let iframeReadySent = false;
+
+window.addEventListener('message', (event) => {
+  if (!event.data || !event.data.html || !event.data.css) return;
+
+  // existing logic for injecting CSS and rendering...
+
+  if (!iframeReadySent) {
+    event.source?.postMessage({ type: 'iframe-ready' }, '*');
+    iframeReadySent = true;
+  }
+});
+    });
+  </script>
+</body>
+</html>

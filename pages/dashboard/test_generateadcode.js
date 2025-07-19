@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import toast, { Toaster } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import ModuleProgressChart from '../../components/ModuleProgressChart';
 import ModuleCompletionMeter from '../../components/ModuleCompletionMeter';
-import { supabase } from '../../lib/supabaseClient';
-
 
 
 const supabase = createClient(
   'https://yyimqdffhozncrqjmpqh.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aW1xZGZmaG96bmNycWptcHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Njc1OTksImV4cCI6MjA2NzU0MzU5OX0.IBLihUKFXvtvIUVA3C7bPoQHfiuQEEdmwgj930RRpFs'
 );
->>>>>>> fdec1661 (initial commit)
 
 export default function GenerateAdCodePage() {
   const [surveys, setSurveys] = useState([]);
@@ -29,11 +27,7 @@ export default function GenerateAdCodePage() {
   const DEFAULT_STYLE = "Style A - Bold & Clean";
   const [selectedCreativeId, setSelectedCreativeId] = useState('');
   const [selectedModuleId, setSelectedModuleId] = useState('');
-  
-  // --- START: Added for Reset Functionality ---
-  const [iframeKey, setIframeKey] = useState(Date.now());
-  const iframeRef = useRef(null);
-  // --- END: Added for Reset Functionality ---
+
 
 
   useEffect(() => {
@@ -54,28 +48,6 @@ export default function GenerateAdCodePage() {
   }
 }, [selectedSurvey, creativeVariants]);
 
-<<<<<<< HEAD
-useEffect(() => {
-  if (selectedSurvey?.id && selectedCreativeId) {
-    supabase
-      .from('Modules')
-      .select('id')
-      .eq('survey_id', selectedSurvey.id)
-      .then(({ data, error }) => {
-        if (data?.length) {
-          const selectedModule = data[Math.floor(Math.random() * data.length)];
-          const creativeParam = selectedCreativeId ? `&creative_id=${selectedCreativeId}` : '';
-          const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
-          setSelectedModuleId(selectedModule.id);
-          setAdCode(src);
-        }
-      });
-  }
-}, [selectedSurvey?.id, selectedCreativeId]);
-
-
-=======
->>>>>>> fdec1661 (initial commit)
   async function fetchCreativeVariants() {
   const { data, error } = await supabase
     .from('creativevariants')
@@ -171,7 +143,6 @@ useEffect(() => {
   }
 
   async function generateIframeCode() {
-<<<<<<< HEAD
   if (!selectedSurvey?.id) {
     toast.error('Please select a survey');
     return;
@@ -189,8 +160,7 @@ useEffect(() => {
 
   const selectedModule = modules[Math.floor(Math.random() * modules.length)];
   setSelectedModuleId(selectedModule.id);
-  const creativeId = selectedCreative?.id;
-  const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
+  const creativeParam = selectedCreativeId ? `&creative_id=${selectedCreativeId}` : '';
   const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
 
   setAdCode(src);
@@ -199,136 +169,118 @@ useEffect(() => {
 
 
   async function simulateCompletes() {
-=======
->>>>>>> fdec1661 (initial commit)
     if (!selectedSurvey?.id) {
       toast.error('Please select a survey');
       return;
     }
 
-    const { data: modules, error } = await supabase
-      .from('Modules')
-      .select('id')
-      .eq('survey_id', selectedSurvey.id);
+    setIsSimulating(true);
+    setSimulated(0);
 
-    if (error || !modules?.length) {
-      toast.error('No modules found for this survey');
-      return;
-    }
+    try {
+      const { data: modules } = await supabase
+        .from('Modules')
+        .select('id')
+        .eq('survey_id', selectedSurvey.id);
 
-    const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-    setSelectedModuleId(selectedModule.id);
-    const creativeParam = selectedCreativeId ? `&creative_id=${selectedCreativeId}` : '';
+      const tasks = Array.from({ length: simulateCount }).map(async () => {
+        const selectedModule = modules[Math.floor(Math.random() * modules.length)];
+        const sessionId = uuidv4();
 
-    // The URL for the iframe src attribute
-    const src = `/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
-    console.log("Generated Ad Code URL:", src);
+        const { data: questions, error: qError } = await supabase
+          .from('questions')
+          .select('question_order, question_text, answer_option')
+          .eq('module_id', selectedModule.id);
 
-    setAdCode(src);
-    // --- START: Added for Reset Functionality ---
-    // Update the iframe key to ensure the preview updates, even if the URL is the same
-    setIframeKey(Date.now());
-    // --- END: Added for Reset Functionality ---
+        if (qError || !questions?.length) return;
+
+        const responseBatch = questions.map(q => {
+          let options = [];
+
+          try {
+            options = typeof q.answer_option === 'string'
+              ? JSON.parse(q.answer_option)
+              : Array.isArray(q.answer_option)
+              ? q.answer_option
+              : [];
+          } catch (err) {
+            console.error("❌ Error parsing answer_option:", q.answer_option, err);
+          }
+
+          const selected = options.length > 0
+            ? options[Math.floor(Math.random() * options.length)]
+            : null;
+
+          return selected ? {
+            id: uuidv4(),
+            module_id: selectedModule.id,
+            user_session_id: sessionId,
+            question_order: q.question_order,
+            question_text: q.question_text,
+            selected_answer: selected,
+            completed: false
+          } : null;
+        }).filter(Boolean);
+
+        if (responseBatch.length > 0) {
+          const insertResult = await supabase
+            .from('ModuleResponses')
+            .insert(responseBatch);
+
+          if (insertResult.error) {
+            console.error('❌ Supabase insert error:', insertResult.error);
+            toast.error('Insert failed. Check console.');
+            return;
+          }
+
+          const { error: updateError } = await supabase
+            .from('ModuleResponses')
+            .update({ completed: true })
+            .eq('user_session_id', sessionId)
+            .eq('module_id', selectedModule.id);
+
+          if (updateError) {
+            console.error('❌ Update failed:', updateError);
+            toast.error('Update failed. Check console.');
+          } else {
+            setSimulated(prev => prev + 1);
+          }
+
+          // Insert to SurveyCompletions if not already present
+const { data: moduleData } = await supabase
+  .from('Modules')
+  .select('survey_id')
+  .eq('id', selectedModule.id)
+  .single();
+
+if (moduleData?.survey_id) {
+  const { error: insertError } = await supabase
+    .from('SurveyCompletions')
+    .insert({
+      survey_id: moduleData.survey_id,
+      module_id: selectedModule.id,
+      user_session_id: sessionId,
+      demo_attributes: {}, // Simulated users have no attributes
+      geo_attributes: {},
+      psycho_attributes: {}
+    });
+
+  if (insertError) {
+    console.error('❌ SurveyCompletions insert error:', insertError);
   }
-
-  // --- START: Added for Reset Functionality ---
-  /**
-   * Resets the preview iframe to simulate a new user session.
-   * It tells the iframe to clear its session cookie, then forces a reload
-   * by changing the iframe's key prop, which causes React to remount it.
-   */
-  function handleResetPreview() {
-    if (iframeRef.current) {
-      // Send message to the iframe to clear its session cookie
-      iframeRef.current.contentWindow.postMessage('clear_session', '*');
-      // Force a remount of the iframe by updating its key
-      setIframeKey(Date.now());
-      toast.success('Preview has been reset for a new session.');
-    } else {
-      toast.error('Please generate a preview first.');
-    }
-  }
-  // --- END: Added for Reset Functionality ---
-
-  async function simulateCompletes() {
-        if (!selectedSurvey?.id) return toast.error('Please select a survey');
-        setIsSimulating(true);
-        setSimulated(0);
-
-        try {
-            const { data: modules } = await supabase.from('Modules').select('id').eq('survey_id', selectedSurvey.id);
-
-            const tasks = Array.from({ length: simulateCount }).map(async () => {
-                const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-                const sessionId = uuidv4();
-
-                // UPDATE: Fetch question_type and answer_option here
-                const { data: questions, error: qError } = await supabase
-                    .from('questions')
-                    .select('question_order, question_text, answer_option, question_type')
-                    .eq('module_id', selectedModule.id);
-
-                if (qError || !questions?.length) return;
-
-                const responseBatch = questions.map(q => {
-                    const { question_type, answer_option } = q;
-                    let selected = null;
-                    
-                    // NEW: Logic to simulate answers based on question type
-                    switch (question_type) {
-                        case 'single_select_radio':
-                        case 'single_select_dropdown':
-                        case 'likert_scale':
-                            selected = answer_option[Math.floor(Math.random() * answer_option.length)];
-                            break;
-                        case 'multiple_select':
-                            const numToSelect = Math.floor(Math.random() * answer_option.length) + 1;
-                            selected = [...answer_option].sort(() => 0.5 - Math.random()).slice(0, numToSelect).join(', ');
-                            break;
-                        case 'rating_scale':
-                            const min = answer_option.min || 1;
-                            const max = answer_option.max || 5;
-                            selected = Math.floor(Math.random() * (max - min + 1)) + min;
-                            break;
-                        case 'ranking':
-                            selected = [...answer_option].sort(() => 0.5 - Math.random()).join(', ');
-                            break;
-                        case 'matrix':
-                            const matrixResponse = {};
-                            (answer_option.rows || []).forEach(row => {
-                                matrixResponse[row] = answer_option.columns[Math.floor(Math.random() * answer_option.columns.length)];
-                            });
-                            selected = JSON.stringify(matrixResponse);
-                            break;
-                        case 'user_input':
-                            // For this simulation, we'll just put a placeholder. The other page handles AI generation.
-                            selected = "Simulated text answer.";
-                            break;
-                        default:
-                            break;
-                    }
-
-                    return selected ? {
-                        id: uuidv4(),
-                        module_id: selectedModule.id,
-                        user_session_id: sessionId,
-                        question_order: q.question_order,
-                        question_text: q.question_text,
-                        selected_answer: selected, // can now be a string, number, or JSON string
-                        completed: false
-                    } : null;
-                }).filter(Boolean);
-                
-                // ... (The rest of the insert/update logic remains the same) ...
-            });
-            await Promise.all(tasks);
-            toast.success(`✅ Finished simulating ${simulateCount} completes.`);
-        } catch (err) {
-            console.error("❌ Simulation error:", err);
-            toast.error('Simulation error');
+}
         }
-        setIsSimulating(false);
+      });
+
+      await Promise.all(tasks);
+      toast.success(`✅ Finished simulating ${simulateCount} completes.`);
+    } catch (err) {
+      console.error("❌ Simulation error:", err);
+      toast.error('Simulation error');
     }
+
+    setIsSimulating(false);
+  }
 
 return (
   <div className="p-10">
@@ -477,16 +429,6 @@ return (
         >
           🚀 Generate Ad Code
         </button>
-        
-        {/* --- START: Added for Reset Functionality --- */}
-        <button
-          className="bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 disabled:opacity-50"
-          onClick={handleResetPreview}
-          disabled={!adCode} // Button is disabled until a preview is generated
-        >
-          🔄 Reset Preview
-        </button>
-        {/* --- END: Added for Reset Functionality --- */}
 
         <div className="text-sm text-gray-600">
           Simulated: {simulated}/{simulateCount}
@@ -507,10 +449,6 @@ return (
 
         <h4 className="font-semibold mt-4 mb-1">Live Preview:</h4>
         <iframe
-          // --- START: Added for Reset Functionality ---
-          ref={iframeRef}
-          key={iframeKey}
-          // --- END: Added for Reset Functionality ---
           src={adCode}
           width="340"
           height="660"

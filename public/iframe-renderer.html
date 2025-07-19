@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Embedded Survey Renderer</title>
+    <style id="dynamic-style"></style>
+    <style>
+      /* Optional: Add any base styles for the iframe itself if needed */
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif; /* A sensible default font */
+      }
+      #iframe-content {
+        /* Add any default styling for the content container */
+        padding: 15px; /* Example padding */
+        box-sizing: border-box; /* Include padding in element's total width and height */
+      }
+      /* Ensure radio buttons and labels are styled consistently */
+      input[type="radio"] {
+        vertical-align: middle;
+      }
+      label {
+        display: flex; /* Helps align radio button and text */
+        align-items: center;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="iframe-content"></div>
+
+    <script>
+      console.log('➡️ iframe-renderer.html: Script loaded. Adding message listener.');
+
+      // Function to handle messages from the parent window
+      window.addEventListener('message', function (event) {
+        const data = event.data;
+
+        // In a production environment, always verify event.origin for security.
+        // if (event.origin !== window.location.origin) {
+        //   console.warn(`⚠️ iframe-renderer.html: Message from unexpected origin: ${event.origin}`);
+        //   return;
+        // }
+
+        if (data?.type === 'load-survey') {
+          console.log('⬅️ iframe-renderer.html: Received load-survey message.');
+          const contentContainer = document.getElementById('iframe-content');
+          const styleTag = document.getElementById('dynamic-style');
+
+          if (styleTag && data.css) {
+            styleTag.textContent = data.css;
+            console.log("✅ iframe-renderer.html: CSS injected into iframe style tag.");
+          } else {
+            console.warn("⚠️ iframe-renderer.html: Style tag (#dynamic-style) or CSS data missing for injection.", { styleTagExists: !!styleTag, cssExists: !!data.css });
+          }
+
+          if (contentContainer && data.html) {
+            contentContainer.innerHTML = data.html;
+            console.log("✅ iframe-renderer.html: HTML injected into iframe-content.");
+
+            // Re-attach event listener to the submit button after injecting new HTML
+            const submitButton = contentContainer.querySelector('#submit-btn');
+            if (submitButton) {
+              // Remove any existing listener to prevent duplicates
+              submitButton.removeEventListener('click', sendNextQuestionSignal);
+              // Add the new listener
+              submitButton.addEventListener('click', sendNextQuestionSignal);
+              console.log("✅ iframe-renderer.html: Submit button event listener re-attached.");
+            } else {
+              console.warn("⚠️ iframe-renderer.html: Submit button (#submit-btn) not found in injected HTML.");
+            }
+          } else {
+              console.warn("⚠️ iframe-renderer.html: Container (#iframe-content) or HTML missing for injection.", { containerExists: !!contentContainer, htmlExists: !!data.html });
+          }
+        }
+      });
+
+      // Function to get the selected answer and send signal to parent for next question/submission
+      function sendNextQuestionSignal() {
+        console.log('🔍 iframe-renderer.html: Submit button clicked. Checking selected answer...');
+        const selectedAnswerElement = document.querySelector('input[name="answer"]:checked');
+        const answerValue = selectedAnswerElement ? selectedAnswerElement.value : null;
+
+        if (!answerValue) {
+            alert('Please select an answer.'); // Alert the user directly in the iframe
+            console.warn('🚫 iframe-renderer.html: No answer selected.');
+            return;
+        }
+        console.log("⬆️ iframe-renderer.html: Sending next-question signal to parent with answer:", answerValue);
+        window.parent.postMessage({ type: 'next-question', answer: answerValue }, '*');
+      }
+
+      // Let parent know iframe is ready as soon as this HTML loads
+      console.log("⬆️ iframe-renderer.html: Sending iframe-ready signal to parent.");
+      window.parent.postMessage({ type: 'iframe-ready' }, '*');
+    </script>
+  </body>
+</html>

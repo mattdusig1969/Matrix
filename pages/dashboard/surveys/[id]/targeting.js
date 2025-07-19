@@ -14,7 +14,7 @@ const CATEGORIES = ['Demographics', 'Geographics', 'Psychographics'];
 
 export default function TargetingPage() {
   const router = useRouter();
-  const { id } = router.query;
+const { id, tab = 'preview' } = router.query;
 
   const [countryId, setCountryId] = useState('');
   const [countryName, setCountryName] = useState('');
@@ -201,21 +201,27 @@ export default function TargetingPage() {
         )}
       </h1>
 
-      <div className="flex space-x-4 border-b mt-4 mb-8">
-        {['general', 'targeting', 'quotas', 'reporting'].map(tab => (
-          <Link
-            key={tab}
-            href={`/dashboard/surveys/${id}/${tab}`}
-            className={`px-4 py-2 border border-b-0 bg-white ${
-              tab === 'targeting'
-                ? 'text-blue-600 font-bold'
-                : 'text-black font-semibold'
-            } rounded-t`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </Link>
-        ))}
-      </div>
+      <div className="flex space-x-4 border-b">
+  <Link href={`/dashboard/surveys/${id}/general`} className={`px-4 py-2 rounded-t-lg ${tab === 'general' ? 'bg-white text-blue-600 font-bold' : 'text-gray-700 font-semibold'}`}>
+    General
+  </Link>
+  <Link href={`/dashboard/surveys/${id}/targeting`} className={`px-4 py-2 rounded-t-lg ${tab === 'targeting' ? 'bg-white text-blue-600 font-bold' : 'text-gray-700 font-semibold'}`}>
+    Targeting
+  </Link>
+  <Link href={`/dashboard/surveys/${id}/modules`} className={`px-4 py-2 rounded-t-lg ${tab === 'modules' ? 'bg-white text-blue-600 font-bold' : 'text-gray-700 font-semibold'}`}>
+    Modules
+  </Link>
+          <Link href={`/dashboard/surveys/${id}/adcode`} className={`px-4 py-2 rounded-t-lg ${tab === 'adcode' ? 'bg-white text-blue-600 font-bold' : 'text-gray-700 font-semibold'}`}>Ad Code</Link>
+  <Link href={`/dashboard/surveys/${id}/preview`} className={`px-4 py-2 rounded-t-lg ${tab === 'preview' ? 'bg-white text-blue-600 font-bold' : 'text-gray-700 font-semibold'}`}>
+    Preview
+  </Link>
+  <Link href={`/dashboard/surveys/${id}/quotas`} className={`px-4 py-2 rounded-t-lg ${tab === 'quotas' ? 'bg-white text-blue-600 font-bold' : 'text-gray-700 font-semibold'}`}>
+    Quotas
+  </Link>
+  <Link href={`/dashboard/surveys/${id}/reporting`} className={`px-4 py-2 rounded-t-lg ${tab === 'reporting' ? 'bg-white text-blue-600 font-bold' : 'text-gray-700 font-semibold'}`}>
+    Reporting
+  </Link>
+</div>
 
       {loading ? (
         <div className="p-6 text-gray-500 italic">Loading targeting interface...</div>

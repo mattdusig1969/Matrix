@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Home, Users, ClipboardList, HelpCircle, User, Megaphone, PieChart } from 'lucide-react';
+import { Home, Users, ClipboardList, HelpCircle, User, Megaphone, PieChart, Beaker } from 'lucide-react';
 
 export default function Sidebar() {
   return (
@@ -25,24 +25,12 @@ export default function Sidebar() {
           <Link href="/dashboard/surveys" className="sidebar-link">
             <ClipboardList className="inline-block w-4 h-4 mr-2" /> Manage Surveys
           </Link>
-          <Link href="/dashboard/questions" className="sidebar-link">
-            <HelpCircle className="inline-block w-4 h-4 mr-2" /> Manage Questions
-          </Link>
-          <Link href="/dashboard/modules" className="sidebar-link">
-            <Image
-              src="/icons/chatgpt.png" // Make sure this file is in /public/icons
-              alt="ChatGPT"
-              width={16}
-              height={16}
-              className="inline-block mr-2"
-            />
-            ChatGPT Modules
-          </Link>
-          <Link href="/dashboard/assignmodules" className="sidebar-link">
-            <User className="inline-block w-4 h-4 mr-2" /> Assign Modules
-          </Link>
           <Link href="/dashboard/generateadcode" className="sidebar-link">
             <Megaphone className="inline-block w-4 h-4 mr-2" /> Generate Ad Code
+          </Link>
+          {/* --- New Link Added --- */}
+          <Link href="/dashboard/simulated-sample" className="sidebar-link">
+            <Beaker className="inline-block w-4 h-4 mr-2" /> Simulated Sample
           </Link>
           <Link href="/dashboard/reports" className="sidebar-link">
             <PieChart className="inline-block w-4 h-4 mr-2" /> Reporting
