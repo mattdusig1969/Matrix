@@ -485,8 +485,6 @@ EmbeddedModule.getLayout = function PageLayout(page) {
   return page;
 };
 
-=======
-
 const SESSION_COOKIE = 'survey_user_session';
 
 // NEW: A map to explicitly link a targeting field to its correct attribute table.
@@ -694,4 +692,3 @@ export default function EmbeddedModule() {
 }
 
 EmbeddedModule.getLayout = (page) => page;
->>>>>>> fdec1661 (initial commit)

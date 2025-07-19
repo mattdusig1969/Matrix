@@ -53,28 +53,21 @@ export default function GenerateAdCodePage() {
   }
 }, [selectedSurvey, creativeVariants]);
 
-<<<<<<< HEAD
 useEffect(() => {
   if (selectedSurvey?.id && selectedCreativeId) {
     supabase
-      .from('Modules')
-      .select('id')
-      .eq('survey_id', selectedSurvey.id)
-      .then(({ data, error }) => {
-        if (data?.length) {
-          const selectedModule = data[Math.floor(Math.random() * data.length)];
-          const creativeParam = selectedCreativeId ? `&creative_id=${selectedCreativeId}` : '';
-          const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
-          setSelectedModuleId(selectedModule.id);
-          setAdCode(src);
+      .from('creativevariants')
+      .select('*')
+      .eq('id', selectedCreativeId)
+      .single()
+      .then((result) => {
+        if (result.data) {
+          setIframePreview(result.data);
         }
       });
   }
 }, [selectedSurvey?.id, selectedCreativeId]);
 
-
-=======
->>>>>>> fdec1661 (initial commit)
   async function fetchCreativeVariants() {
   const { data, error } = await supabase
     .from('creativevariants')
@@ -170,36 +163,22 @@ useEffect(() => {
   }
 
   async function generateIframeCode() {
-<<<<<<< HEAD
   if (!selectedSurvey?.id) {
     toast.error('Please select a survey');
     return;
   }
-
-  const { data: modules, error } = await supabase
-    .from('Modules')
-    .select('id')
-    .eq('survey_id', selectedSurvey.id);
-
-  if (error || !modules?.length) {
-    toast.error('No modules found for this survey');
-    return;
-  }
-
-  const selectedModule = modules[Math.floor(Math.random() * modules.length)];
-  setSelectedModuleId(selectedModule.id);
-  const creativeId = selectedCreative?.id;
-  const creativeParam = creativeId ? `&creative_id=${creativeId}` : '';
-  const src = `${window.location.origin}/embed/module?survey_id=${selectedSurvey.id}&module_id=${selectedModule.id}${creativeParam}`;
-
-  setAdCode(src);
-
-}
-
+  const iframeCode = generateIframe(
+    selectedSurvey,
+    selectedCreativeId,
+    iframePreview?.html_code,
+    iframePreview?.css_code
+  );
+  setGeneratedCode(iframeCode);
+  setShowPreview(true);
+  setShowCode(true);
 
   async function simulateCompletes() {
-=======
->>>>>>> fdec1661 (initial commit)
+
     if (!selectedSurvey?.id) {
       toast.error('Please select a survey');
       return;
