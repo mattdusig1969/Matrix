@@ -1,15 +1,13 @@
-// pages/dashboard/index.js
+// pages/index.js
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 
-import Layout from '../components/Layout';
+export default function Home() {
+  const router = useRouter();
 
-export default function Dashboard() {
-  return (
-    <Layout title="Dashboard">
-      <div className="flex justify-center items-center h-[calc(100vh-100px)]">
-        <h1 className="text-4xl font-bold text-center text-gray-800">
-          Welcome to Matrix
-        </h1>
-      </div>
-    </Layout>
-  );
+  useEffect(() => {
+    router.replace('/dashboard');
+  }, [router]);
+
+  return null;
 }
