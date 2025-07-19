@@ -11,7 +11,6 @@ const supabase = createClient(
   'https://yyimqdffhozncrqjmpqh.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aW1xZGZmaG96bmNycWptcHFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5Njc1OTksImV4cCI6MjA2NzU0MzU5OX0.IBLihUKFXvtvIUVA3C7bPoQHfiuQEEdmwgj930RRpFs'
 );
->>>>>>> fdec1661 (initial commit)
 
 export default function GenerateAdCodePage() {
   const [surveys, setSurveys] = useState([]);
